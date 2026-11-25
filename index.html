@@ -218,10 +218,8 @@
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       if (/android/i.test(userAgent)) {
           window.location.href = `intent://#Intent;package=${packageName};scheme=freefire;end`;
-          setTimeout(() => { window.location.href = `https://play.google.com/store/apps/details?id=${packageName}`; }, 1500);
       } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
           window.location.href = 'freefire://';
-          setTimeout(() => { window.location.href = 'https://apps.apple.com/br/app/garena-free-fire/id1018017380'; }, 1500);
       } else { alert("A abertura automática do app funciona apenas no celular."); }
     }
 

@@ -11,7 +11,6 @@
   <link rel="apple-touch-icon" href="icon.png">
 
   <style>
-    /* ... (Mantenha todo o CSS que está no seu arquivo, não mudei nada no visual) ... */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: #030000; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative; }
@@ -105,9 +104,10 @@
     <button class="start-btn" id="startBtn">Iniciar Jogo</button>
   </div>
 
+  <!-- SCRIPT DO FIREBASE CORRIGIDO -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC2vQuHXH6hzBg4MjWMNK2h4V_QFbfNfsw",
@@ -128,8 +128,18 @@
     const loginBtn = document.getElementById('loginBtn');
     const loginError = document.getElementById('loginError');
 
+    // Função que cria e salva o ID do aparelho no celular
+    function getDeviceId() {
+      let id = localStorage.getItem('rk7s_device');
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('rk7s_device', id);
+      }
+      return id;
+    }
+
     loginBtn.addEventListener('click', async () => {
-      const key = keyInput.value.trim();
+      const key = keyInput.value.trim().toUpperCase(); // Força ficar maiúsculo
       if (!key) return;
 
       loginBtn.textContent = 'Verificando...';
@@ -140,16 +150,59 @@
         const docRef = doc(db, "keys", key);
         const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists() && docSnap.data().active === true) {
-          loginScreen.style.display = 'none';
-          mainWrapper.classList.add('active');
-        } else {
+        if (!docSnap.exists()) {
+          loginError.textContent = 'Key não encontrada.';
           loginError.style.display = 'block';
-          loginError.textContent = 'Key inválida ou expirada.';
+          return;
         }
+
+        const data = docSnap.data();
+
+        // 1. Checa se está ativa
+        if (data.active !== true) {
+          loginError.textContent = 'Esta key está desativada.';
+          loginError.style.display = 'block';
+          return;
+        }
+
+        // 2. Checa se expirou
+        if (new Date(data.expireAt) < new Date()) {
+          loginError.textContent = 'Esta key está expirada.';
+          loginError.style.display = 'block';
+          return;
+        }
+
+        // 3. LÓGICA DE DISPOSITIVOS
+        const deviceId = getDeviceId();
+        const devices = data.devices || [];
+        const jaRegistrado = devices.some(d => d.id === deviceId);
+
+        if (!jaRegistrado) {
+          if (devices.length >= (data.maxDevices || 2)) {
+            loginError.textContent = `Limite de ${data.maxDevices} celular(es) atingido!`;
+            loginError.style.display = 'block';
+            return;
+          }
+          
+          // Se tem vaga, registra o novo celular no banco
+          await updateDoc(docRef, {
+            devices: arrayUnion({
+              id: deviceId,
+              userAgent: navigator.userAgent.slice(0, 60),
+              firstSeen: new Date().toISOString()
+            })
+          });
+        }
+
+        // Tudo ok, libera o painel
+        localStorage.setItem('rk7s_key_salva', key);
+        loginScreen.style.display = 'none';
+        mainWrapper.classList.add('active');
+
       } catch (error) {
+        console.error(error);
         loginError.style.display = 'block';
-        loginError.textContent = 'Erro de conexão.';
+        loginError.textContent = 'Erro de conexão: ' + error.message;
       } finally {
         loginBtn.textContent = 'Acessar';
         loginBtn.disabled = false;

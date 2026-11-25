@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>RK7S V2</title>
   
-  <!-- Configurações do PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#030000">
   <link rel="apple-touch-icon" href="icon.png">
@@ -104,7 +103,7 @@
     <button class="start-btn" id="startBtn">Iniciar Jogo</button>
   </div>
 
-  <!-- SCRIPT DO FIREBASE CORRIGIDO -->
+  <!-- FIREBASE -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, getDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -128,7 +127,6 @@
     const loginBtn = document.getElementById('loginBtn');
     const loginError = document.getElementById('loginError');
 
-    // Função que cria e salva o ID do aparelho no celular
     function getDeviceId() {
       let id = localStorage.getItem('rk7s_device');
       if (!id) {
@@ -139,7 +137,7 @@
     }
 
     loginBtn.addEventListener('click', async () => {
-      const key = keyInput.value.trim().toUpperCase(); // Força ficar maiúsculo
+      const key = keyInput.value.trim().toUpperCase();
       if (!key) return;
 
       loginBtn.textContent = 'Verificando...';
@@ -158,21 +156,18 @@
 
         const data = docSnap.data();
 
-        // 1. Checa se está ativa
         if (data.active !== true) {
           loginError.textContent = 'Esta key está desativada.';
           loginError.style.display = 'block';
           return;
         }
 
-        // 2. Checa se expirou
         if (new Date(data.expireAt) < new Date()) {
           loginError.textContent = 'Esta key está expirada.';
           loginError.style.display = 'block';
           return;
         }
 
-        // 3. LÓGICA DE DISPOSITIVOS
         const deviceId = getDeviceId();
         const devices = data.devices || [];
         const jaRegistrado = devices.some(d => d.id === deviceId);
@@ -184,7 +179,6 @@
             return;
           }
           
-          // Se tem vaga, registra o novo celular no banco
           await updateDoc(docRef, {
             devices: arrayUnion({
               id: deviceId,
@@ -194,7 +188,6 @@
           });
         }
 
-        // Tudo ok, libera o painel
         localStorage.setItem('rk7s_key_salva', key);
         loginScreen.style.display = 'none';
         mainWrapper.classList.add('active');
@@ -212,18 +205,9 @@
     keyInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') loginBtn.click();
     });
-
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(registration => {
-          console.log('ServiceWorker registrado:', registration.scope);
-        }).catch(error => {
-          console.log('Falha no ServiceWorker:', error);
-        });
-      });
-    }
   </script>
 
+  <!-- LÓGICA DO MENU E SCRIPT DO JOGO -->
   <script>
     window.state = { aimbot_precisao: false, reduzir_tremadeira: false, precisao_valor: 0, aumentar_fps: false, reduzir_latencia: false, arquivo_config: null };
 
@@ -267,30 +251,34 @@
       }
     });
 
-    function abrirJogo(packageName) {
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      if (/android/i.test(userAgent)) {
-          window.location.href = `intent://#Intent;package=${packageName};scheme=freefire;end`;
-      } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
-          window.location.href = 'freefire://';
-      } else { alert("A abertura automática do app funciona apenas no celular."); }
-    }
-
+    // BOTÃO INICIAR - NÃO SAI DO APP
     document.getElementById('startBtn').addEventListener('click', async () => {
       const btn = document.getElementById('startBtn');
       btn.textContent = 'Iniciando...';
+      
       try {
-        let scriptParaInjetar = window.state.arquivo_config ? await window.state.arquivo_config.text() : `console.log("Nenhum arquivo selecionado.");`;
+        // Se tiver arquivo, lê o conteúdo. Senão, manda um log simples.
+        let scriptParaInjetar = window.state.arquivo_config 
+          ? await window.state.arquivo_config.text() 
+          : `console.log("RK7S: Nenhum arquivo selecionado.");`;
+        
+        // Executa o script do arquivo
         eval(scriptParaInjetar);
-        abrirJogo('com.dts.freefireth'); 
-        setTimeout(() => { btn.textContent = 'Iniciar Jogo'; }, 2000);
+        
+        // Mostra que deu certo SEM SAIR DO APP
+        setTimeout(() => {
+          alert("✅ Script ativado com sucesso!\n\nAgora você pode abrir o Free Fire manualmente.");
+          btn.textContent = 'Iniciar Jogo';
+        }, 800);
+
       } catch (error) {
         console.error("Erro:", error);
-        alert("Erro ao executar o arquivo.");
+        alert("❌ Erro ao executar o script:\n" + error.message);
         btn.textContent = 'Iniciar Jogo';
       }
     });
 
+    // PARTÍCULAS DE FUNDO
     (function() {
       const canvas = document.getElementById('particle-canvas');
       const ctx = canvas.getContext('2d');
